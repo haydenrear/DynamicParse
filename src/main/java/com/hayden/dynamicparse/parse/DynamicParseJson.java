@@ -151,7 +151,6 @@ public class DynamicParseJson {
                     try {
                         clzz = Class.forName(innerDynamic.get().clzz.getName());
                     } catch (ClassNotFoundException e) {
-                        e.printStackTrace();
                         clzz = innerDynamic.get().clzz.toClass();
                     }
                     addFieldToCtClass(newClass, prev, innerDynamic.get().clzz);
