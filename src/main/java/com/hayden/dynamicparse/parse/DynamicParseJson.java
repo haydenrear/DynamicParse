@@ -8,6 +8,7 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
+import java.io.IOException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -61,7 +62,10 @@ public class DynamicParseJson {
         return new ClassAndClasses(toLookThrough.clzz, new ArrayList<>());
     }
 
-    public ClassAndClasses clzzFound(List<CtClass> toLookThrough, String key, List<CtClass> parents) throws NotFoundException {
+    public ClassAndClasses clzzFound(List<CtClass> toLookThrough,
+                                     String key,
+                                     List<CtClass> parents
+    ) throws NotFoundException {
         for(var ctClzz : toLookThrough){
             if(ctClzz.getName().contains(key)){
                 return new ClassAndClasses(ctClzz, parents);
@@ -75,13 +79,21 @@ public class DynamicParseJson {
         return null;
     }
 
+    public Optional<CtClzzz> dynamicParse(String data, String name, Optional<String> directoryName) throws DynamicParsingException {
+        return dynamicParse(data, name, Optional.empty(), directoryName);
+    }
 
-    public Optional<CtClzzz> dynamicParse(String data, String name, CtClass newClass) throws DynamicParsingException {
+    public Optional<CtClzzz> dynamicParse(String data, String name) throws DynamicParsingException {
+        return dynamicParse(data, name, Optional.empty(), Optional.empty());
+    }
 
-        if(newClass == null){
-            ClassPool classPool = ClassPool.getDefault();
-            newClass = classPool.makeClass(name);
-        }
+    public Optional<CtClzzz> dynamicParse(String data, CtClass clzz, String name) throws DynamicParsingException {
+        return dynamicParse(data, name, Optional.of(clzz), Optional.empty());
+    }
+
+    public Optional<CtClzzz> dynamicParse(String data, String name, Optional<CtClass> parentClass, Optional<String> directoryName) throws DynamicParsingException {
+
+        CtClass newClass = parentClass.orElseGet(() -> ClassPool.getDefault().makeClass(name));
 
         newClass.setModifiers(Modifier.PUBLIC);
         try {
@@ -94,17 +106,19 @@ public class DynamicParseJson {
             var jsonParser = new JSONParser();
             Object parsed = jsonParser.parse(data);
             if(parsed instanceof JSONObject obj){
-                dynamicParse(obj, newClass);
+                dynamicParse(obj, newClass, directoryName);
             }
             else if(parsed instanceof JSONArray arr){
-                return Optional.of(dynamicParse(arr, newClass, name+"List"));
+                return Optional.of(dynamicParse(arr, newClass, name+"List", directoryName));
             }
             else {
                 throw new DynamicParsingException("Object parsed neither object nor array");
             }
-
+            if(directoryName.isPresent()){
+                newClass.writeFile(directoryName.get());
+            }
             return Optional.of(new CtClzzz(newClass, Optional.empty(), Arrays.stream(newClass.getNestedClasses()).toList()));
-        } catch (ParseException | NotFoundException e) {
+        } catch (ParseException | NotFoundException | CannotCompileException | IOException e) {
             e.printStackTrace();
         }
 
@@ -116,7 +130,8 @@ public class DynamicParseJson {
     public CtClzzz dynamicParse(
             JSONArray arr,
             CtClass newClass,
-            String prev
+            String prev,
+            Optional<String> directoryName
     ) throws DynamicParsingException {
         for(var toParse : arr){
             var typeOfArray = Array.newInstance(toParse.getClass(), 0).getClass();
@@ -131,17 +146,25 @@ public class DynamicParseJson {
             }
             else if(toParse instanceof JSONObject object){
                 try {
-                    dynamicParse(object, newClass);
-                    var clzz = newClass.toClass();
+                    var innerDynamic = dynamicParse(object.toJSONString(), prev, Optional.of(newClass.makeNestedClass(prev, true)), directoryName);
+                    Class<?> clzz = null;
+                    try {
+                        clzz = Class.forName(innerDynamic.get().clzz.getName());
+                    } catch (ClassNotFoundException e) {
+                        e.printStackTrace();
+                        clzz = innerDynamic.get().clzz.toClass();
+                    }
+                    addFieldToCtClass(newClass, prev, innerDynamic.get().clzz);
                     objectMapper.registerSubtypes(clzz);
                     return new CtClzzz(newClass, Optional.of(clzz), Arrays.stream(newClass.getNestedClasses()).toList());
                 } catch (NotFoundException | CannotCompileException e) {
                     e.printStackTrace();
                 }
+                break;
             }
             else if(toParse instanceof JSONArray innerArr){
                 var primOrOpt = findIfPrimitive(innerArr, 1);
-                if(primOrOpt.isPresent()){
+                if(primOrOpt.isPresent()) {
                     var primOr = primOrOpt.get();
                     if(primOr.isPrim){
                         try {
@@ -153,7 +176,7 @@ public class DynamicParseJson {
                         }
                     }
                     else {
-                        var innerClass = dynamicParse(primOr.jo.toJSONString(), prev, newClass.makeNestedClass(prev, true));
+                        var innerClass = dynamicParse(primOr.jo.toJSONString(), prev, Optional.of(newClass.makeNestedClass(prev, true)), directoryName);
                         if(innerClass.isPresent()){
                             try {
                                 var clzz = innerClass.get().clzz.toClass();
@@ -166,20 +189,25 @@ public class DynamicParseJson {
                             }
                         }
                     }
+                    break;
                 }
                 else throw new DynamicParsingException("Problem recursively finding depth of array ..");
             }
+            break;
         }
-        throw new DynamicParsingException("Problem recursively finding depth of array ..");
+        return null;
     }
 
-    public void dynamicParse(JSONObject obj, CtClass newClass)
+    public void dynamicParse(JSONObject obj,
+                             CtClass newClass,
+                             Optional<String> directoryName
+    )
             throws DynamicParsingException
     {
         for(var toParse : obj.entrySet()){
             if(toParse instanceof Map.Entry entry) {
                 if(entry.getKey() instanceof String key){
-                    if(ClassUtils.isPrimitiveOrWrapper(entry.getValue().getClass())){
+                    if(ClassUtils.isPrimitiveOrWrapper(entry.getValue().getClass()) || entry.getValue() instanceof String){
                         try {
                             var ctClass = ClassPool.getDefault().get(entry.getValue().getClass().getName());
                             addFieldToCtClass(newClass, key, ctClass);
@@ -188,22 +216,19 @@ public class DynamicParseJson {
                         }
                     }
                     else if(entry.getValue() instanceof JSONObject object){
-                        var innerDynamic = dynamicParse(object.toJSONString(), key, newClass.makeNestedClass(key, true));
+                        var innerDynamic = dynamicParse(object.toJSONString(), key, Optional.of(newClass.makeNestedClass(key, true)), directoryName);
                         if(innerDynamic.isPresent()) {
                             try {
-                                objectMapper.registerSubtypes(innerDynamic.get().clzz.toClass());
                                 addFieldToCtClass(newClass, key, innerDynamic.get().clzz);
+                                objectMapper.registerSubtypes(innerDynamic.get().clzz.toClass());
                             } catch (CannotCompileException e) {
                                 e.printStackTrace();
                             }
                         }
                     }
                     else if(entry.getValue() instanceof JSONArray arr){
-                        dynamicParse(arr, newClass, key);
+                        dynamicParse(arr, newClass, key, directoryName);
                     }
-                }
-                else {
-                    throw new DynamicParsingException("Cannot dynamically parse objects with complex objects as key");
                 }
             }
         }
@@ -228,6 +253,8 @@ public class DynamicParseJson {
 
     private void addFieldToCtClass(CtClass newClass, String key, CtClass ctClass)  {
         try {
+            if(newClass.isFrozen())
+                newClass.defrost();
             CtField field = new CtField(ctClass, key, newClass);
             field.setModifiers(Modifier.PUBLIC);
             newClass.addField(field);
