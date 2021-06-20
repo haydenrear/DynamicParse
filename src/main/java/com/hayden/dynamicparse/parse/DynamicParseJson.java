@@ -17,6 +17,7 @@ import java.util.*;
 public class DynamicParseJson {
 
     ObjectMapper objectMapper;
+    private Class<?> mapArray;
 
     public DynamicParseJson(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
@@ -133,68 +134,104 @@ public class DynamicParseJson {
             String prev,
             Optional<String> directoryName
     ) throws DynamicParsingException {
-        for(var toParse : arr){
-            var typeOfArray = Array.newInstance(toParse.getClass(), 0).getClass();
-            if(ClassUtils.isPrimitiveOrWrapper(toParse.getClass()) || toParse instanceof String){
-                try {
-                    var ctArray = ClassPool.getDefault().get(typeOfArray.getName());
-                    addFieldToCtClass(newClass, prev, ctArray);
-                    break;
-                } catch (NotFoundException e) {
-                    e.printStackTrace();
-                }
+        if(arr.size() == 0){
+            try {
+                addFieldToCtClass(newClass, prev, ClassPool.getDefault().get(Array.newInstance(String.class,0).getClass().getName()));
+            } catch (NotFoundException e) {
+                e.printStackTrace();
+                System.out.println("unable to add field for value with no values");
             }
-            else if(toParse instanceof JSONObject object){
-                try {
-                    var innerDynamic = dynamicParse(object.toJSONString(), prev, Optional.of(newClass.makeNestedClass(prev, true)), directoryName);
-                    Class<?> clzz = null;
+        }
+        else {
+            for(var toParse : arr){
+                var typeOfArray = Array.newInstance(toParse.getClass(), 0).getClass();
+                if(ClassUtils.isPrimitiveOrWrapper(toParse.getClass()) || toParse instanceof String){
                     try {
-                        clzz = Class.forName(innerDynamic.get().clzz.getName());
-                    } catch (ClassNotFoundException e) {
-                        clzz = innerDynamic.get().clzz.toClass();
+                        var ctArray = ClassPool.getDefault().get(typeOfArray.getName());
+                        addFieldToCtClass(newClass, prev, ctArray);
+                        break;
+                    } catch (NotFoundException e) {
+                        e.printStackTrace();
                     }
-                    addFieldToCtClass(newClass, prev, innerDynamic.get().clzz);
-                    objectMapper.registerSubtypes(clzz);
-                    return new CtClzzz(newClass, Optional.of(clzz), Arrays.stream(newClass.getNestedClasses()).toList());
-                } catch (NotFoundException | CannotCompileException e) {
-                    e.printStackTrace();
                 }
-                break;
-            }
-            else if(toParse instanceof JSONArray innerArr){
-                var primOrOpt = findIfPrimitive(innerArr, 1);
-                if(primOrOpt.isPresent()) {
-                    var primOr = primOrOpt.get();
-                    if(primOr.isPrim){
+                else if(toParse instanceof JSONObject object){
+                    if(justAMap(arr)){
                         try {
-                            CtClass arrCtClzz = ClassPool.getDefault().get(Array.newInstance(primOr.primType, primOr.depth, 1).getClass().getName());
-                            addFieldToCtClass(newClass, prev, arrCtClzz);
-                            return new CtClzzz(newClass, Optional.of(primOr.primType()), Arrays.stream(newClass.getNestedClasses()).toList());
+                            mapArray = Array.newInstance(Map.class, 0).getClass();
+                            addFieldToCtClass(newClass, prev, ClassPool.getDefault().get(mapArray.getName()));
+                            return new CtClzzz(newClass, Optional.of(mapArray), Arrays.stream(newClass.getNestedClasses()).toList());
                         } catch (NotFoundException e) {
                             e.printStackTrace();
                         }
                     }
                     else {
-                        var innerClass = dynamicParse(primOr.jo.toJSONString(), prev, Optional.of(newClass.makeNestedClass(prev, true)), directoryName);
-                        if(innerClass.isPresent()){
+                        try {
+                            var innerDynamic = dynamicParse(object.toJSONString(), prev, Optional.of(newClass.makeNestedClass(prev, true)), directoryName);
+                            Class<?> clzz = null;
                             try {
-                                var clzz = innerClass.get().clzz.toClass();
-                                objectMapper.registerSubtypes(clzz);
-                                var arrCtClzz = ClassPool.getDefault().get(Array.newInstance(clzz, primOr.depth, 1).getClass().getName());
+                                clzz = Array.newInstance(Class.forName(innerDynamic.get().clzz.getName()), 1).getClass();
+                            } catch (ClassNotFoundException e) {
+                                clzz = Array.newInstance(innerDynamic.get().clzz.toClass(), 1).getClass();
+                            }
+                            addFieldToCtClass(newClass, prev, ClassPool.getDefault().get(clzz.getName()));
+                            objectMapper.registerSubtypes(Class.forName(innerDynamic.get().clzz.getName()));
+                            return new CtClzzz(newClass, Optional.of(clzz), Arrays.stream(newClass.getNestedClasses()).toList());
+                        } catch (NotFoundException | CannotCompileException | ClassNotFoundException e) {
+                            e.printStackTrace();
+                        }
+                        break;
+                    }
+                }
+                else if(toParse instanceof JSONArray innerArr){
+                    var primOrOpt = findIfPrimitive(innerArr, 1);
+                    if(primOrOpt.isPresent()) {
+                        var primOr = primOrOpt.get();
+                        if(primOr.isPrim){
+                            try {
+                                CtClass arrCtClzz = ClassPool.getDefault().get(Array.newInstance(primOr.primType, primOr.depth, 1).getClass().getName());
                                 addFieldToCtClass(newClass, prev, arrCtClzz);
-                                return new CtClzzz(newClass, Optional.of(clzz), Arrays.stream(newClass.getNestedClasses()).toList());
-                            } catch (NotFoundException | CannotCompileException e) {
+                                return new CtClzzz(newClass, Optional.of(primOr.primType()), Arrays.stream(newClass.getNestedClasses()).toList());
+                            } catch (NotFoundException e) {
                                 e.printStackTrace();
                             }
                         }
+                        else {
+                            var innerClass = dynamicParse(primOr.jo.toJSONString(), prev, Optional.of(newClass.makeNestedClass(prev, true)), directoryName);
+                            if(innerClass.isPresent()){
+                                try {
+                                    var clzz = innerClass.get().clzz.toClass();
+                                    objectMapper.registerSubtypes(clzz);
+                                    var arrCtClzz = ClassPool.getDefault().get(Array.newInstance(clzz, primOr.depth, 1).getClass().getName());
+                                    addFieldToCtClass(newClass, prev, arrCtClzz);
+                                    return new CtClzzz(newClass, Optional.of(clzz), Arrays.stream(newClass.getNestedClasses()).toList());
+                                } catch (NotFoundException | CannotCompileException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        }
+                        break;
                     }
-                    break;
+                    else throw new DynamicParsingException("Problem recursively finding depth of array ..");
                 }
-                else throw new DynamicParsingException("Problem recursively finding depth of array ..");
+                break;
             }
-            break;
+
         }
         return null;
+    }
+
+    private boolean justAMap(JSONArray arr) {
+        for(var a : arr) {
+            Set<String> prev = null;
+            if (a instanceof JSONObject obj) {
+                if (obj.keySet().stream().findFirst().get() instanceof String) {
+                    if (prev == null)
+                        prev = obj.keySet();
+                    else return !prev.containsAll((Set<String>) obj.keySet());
+                }
+            }
+        }
+        return true;
     }
 
     public void dynamicParse(JSONObject obj,

@@ -44,7 +44,8 @@ class DynamicParseStarterApplicationTests {
 
         var output= dynamicParseJson.dynamicParse(sb.toString(), "token", Optional.empty(), Optional.empty()).get();
         System.out.println(output);
-//        var val = om.readValue(sb.toString(), output.clzz().toClass());
+        var val = om.readValue(sb.toString(), output.clzz().toClass());
+        assertThat(om.writeValueAsString(val)).isEqualTo(sb.toString().replaceAll("\\s+", ""));
     }
 
     @Test @SneakyThrows
