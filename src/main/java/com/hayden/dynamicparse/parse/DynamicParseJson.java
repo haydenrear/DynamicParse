@@ -51,39 +51,46 @@ public class DynamicParseJson {
 
 
     public List<Object> parseParsedByKey(String key, Class<?> clzzToParse, Object dataToParse) {
-        Object obj = null;
-        Object objFound = null;
         List<Object> lst = new ArrayList<>();
 
         try {
             Class<?> arrType = clzzToParse;
-            int dim = 0;
+
             while(clzzToParse.isArray()){
                 clzzToParse = clzzToParse.getComponentType();
-                ++dim;
             }
-            for (Field f : clzzToParse.getFields()) {
-                if (f.getName().equals(key)) {
-                    //Todo: Need to account for arrays of arrays
-                    if(dataToParse instanceof Object[] objArray){
-                        for(Object found : objArray)
-                            lst.add(f.get(found));
-                    }
-                    else {
-                        lst.add(f.get(dataToParse));
+
+            if(clzzToParse == Map.class){
+                if(clzzToParse != arrType){
+                    List<Object> maps = new ArrayList<>();
+                    iterateAndAddToList(dataToParse, maps);
+                    for(var map : maps){
+                        iterateMap(key, (Map) map);
                     }
                 }
-                else if(!ClassUtils.isPrimitiveOrWrapper(f.getType()) && f.getType() != String.class){
-                    if(arrType != clzzToParse){
-                        //Todo: Need to account for arrays of arrays
-                        if(dataToParse instanceof Object[] objArray) {
-                            for (var arrItem : objArray) {
-                                lst.addAll(parseParsedByKey(key, f.getType(), f.get(arrItem)));
-                            }
+                else{
+                    iterateMap(key, (Map) dataToParse);
+                }
+            }
+
+            else if(!ClassUtils.isPrimitiveOrWrapper(clzzToParse) && clzzToParse != String.class) {
+                for (Field f : clzzToParse.getFields()) {
+
+                    if (f.getName().equals(key)) {
+                        List<Object> tempList = new ArrayList<>();
+                        iterateAndAddToList(dataToParse, tempList);
+                        for(var o : tempList){
+                            lst.add(f.get(o));
                         }
                     }
-                    else {
-                        lst.addAll(parseParsedByKey(key, f.getType(), f.get(dataToParse)));
+
+//                else {
+                    else if (!ClassUtils.isPrimitiveOrWrapper(f.getType()) && f.getType() != String.class) {
+                        List<Object> upNext = new ArrayList<>();
+                        iterateAndAddToList(dataToParse, upNext);
+                        for(var o : upNext){
+                            lst.addAll(parseParsedByKey(key, f.getType(), f.get(o)));
+                        }
                     }
                 }
             }
@@ -91,6 +98,48 @@ public class DynamicParseJson {
             e.printStackTrace();
         }
         return lst;
+    }
+
+    private List<Object> iterateMap(String key, Map map) throws IllegalAccessException {
+        List<Object> lst = new ArrayList<>();
+        for(var entry : map.entrySet()){
+            if(entry instanceof Map.Entry<?,?> e){
+                if(e.getKey() instanceof String keyVal){
+                    if(keyVal.equals(key)){
+                        if(ClassUtils.isPrimitiveOrWrapper(e.getValue().getClass())){
+                            lst.add(e.getValue());
+                        }
+                        else {
+                            iterateAndAddToList(e.getValue(), lst);
+                        }
+                    }
+                }
+            }
+        }
+        return lst;
+    }
+
+
+    public void iterateAndAddToList(Object dataToParse, List<Object> lst) throws IllegalAccessException {
+        List<Object> objectsTo = new ArrayList<>();
+        var finalVals = tryArrayAndAdd(dataToParse, objectsTo);
+        lst.addAll(finalVals);
+    }
+
+    public List<Object> tryArrayAndAdd(Object toCheck, List<Object> objects){
+        List<Object> tempList = new ArrayList<>();
+        if(toCheck instanceof Object[] arr){
+            if(objects.size() >1){
+                for(var o : objects){
+                    tempList.addAll(Arrays.asList((Object[]) o));
+                }
+                tempList.addAll(tryArrayAndAdd(tempList.get(0), tempList));
+            }
+            else {
+                tempList.addAll(Arrays.asList((Object[]) toCheck));
+            }
+        }
+        return tempList;
     }
 
     public record ClassAndClasses(CtClass clzz, List<CtClass> innerClzzs){}

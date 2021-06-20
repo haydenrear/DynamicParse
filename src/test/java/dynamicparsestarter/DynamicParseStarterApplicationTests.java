@@ -44,8 +44,12 @@ class DynamicParseStarterApplicationTests {
 
         var output= dynamicParseJson.dynamicParse(sb.toString(), "token", Optional.empty(), Optional.empty()).get();
         var obj = om.readValue(sb.toString(), output.clzz().toClass());
-        var symbols = dynamicParseJson.parseParsedByKey("symbol", output, obj);
-        assertThat(symbols.size()).isEqualTo(121);
+//        var symbols = dynamicParseJson.parseParsedByKey("symbol", output, obj);
+//        assertThat(symbols.size()).isEqualTo(121);
+        var timeInFoce = dynamicParseJson.parseParsedByKey("timeInForce", output, obj);
+        for(var t : timeInFoce){
+            System.out.println(t);
+        }
     }
 
     @Test @SneakyThrows
