@@ -45,11 +45,7 @@ class DynamicParseStarterApplicationTests {
         var output= dynamicParseJson.dynamicParse(sb.toString(), "token", Optional.empty(), Optional.empty()).get();
         var obj = om.readValue(sb.toString(), output.clzz().toClass());
         var symbols = dynamicParseJson.parseParsedByKey("symbol", output, obj);
-        for(var s : symbols){
-            if(s instanceof String symbol){
-                System.out.println(symbol);
-            }
-        }
+        assertThat(symbols.size()).isEqualTo(121);
     }
 
     @Test @SneakyThrows
