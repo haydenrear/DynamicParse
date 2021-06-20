@@ -35,6 +35,24 @@ class DynamicParseStarterApplicationTests {
     ObjectMapper om;
 
     @Test @SneakyThrows
+    public void mostComplexGettingValues(){
+        StringBuilder sb = new StringBuilder();
+
+        try(BufferedReader fr = new BufferedReader( new FileReader("src/test/resources/test.json"))){
+            fr.lines().forEachOrdered(sb::append);
+        }
+
+        var output= dynamicParseJson.dynamicParse(sb.toString(), "token", Optional.empty(), Optional.empty()).get();
+        var obj = om.readValue(sb.toString(), output.clzz().toClass());
+        var symbols = dynamicParseJson.parseParsedByKey("symbol", output, obj);
+        for(var s : symbols){
+            if(s instanceof String symbol){
+                System.out.println(symbol);
+            }
+        }
+    }
+
+    @Test @SneakyThrows
     public void mostComplex(){
         StringBuilder sb = new StringBuilder();
 

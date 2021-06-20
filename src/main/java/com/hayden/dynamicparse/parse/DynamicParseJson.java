@@ -18,6 +18,7 @@ public class DynamicParseJson {
 
     ObjectMapper objectMapper;
     private Class<?> mapArray;
+    private Class<?> clzzFound;
 
     public DynamicParseJson(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
@@ -25,26 +26,71 @@ public class DynamicParseJson {
 
     public record CtClzzz(CtClass clzz, Optional<Class<?>> arrClzz, List<CtClass> ctClzzzs){}
 
-    public List<Object> parseParsedByKey(String key, CtClzzz clzzToParse, Object dataToParse) throws NotFoundException {
+    public List<Object> parseParsedByKey(String key, CtClzzz clzzToParse, Object dataToParse) {
         Object obj = null;
+        Object objFound = null;
 
         List<Object> values = new ArrayList<>();
-        List<CtClass> clzzes = clzzFound(clzzToParse, key).innerClzzs;
-        clzzes.add(clzzToParse.clzz);
 
-        for (CtClass ctClass : clzzes) {
-            try {
-                for (Field f : Class.forName(ctClass.getName()).getFields()) {
-                    if (f.getName().equals(key)) {
-                        obj = f.get(obj == null ? dataToParse : obj);
-                        values.add(obj);
-                    }
+        try {
+            clzzFound = clzzToParse.arrClzz.orElse(Class.forName(clzzToParse.clzz.getName()));
+            for (Field f : clzzFound.getFields()) {
+                if (f.getName().equals(key)) {
+                    obj = f.get(dataToParse);
+                    values.add(obj);
                 }
-            } catch (ClassNotFoundException | IllegalAccessException e) {
-                e.printStackTrace();
+                else {
+                    values.addAll(parseParsedByKey(key, f.getType(), f.get(dataToParse)));
+                }
             }
+        } catch (ClassNotFoundException | IllegalAccessException e) {
+            e.printStackTrace();
         }
         return values;
+    }
+
+
+    public List<Object> parseParsedByKey(String key, Class<?> clzzToParse, Object dataToParse) {
+        Object obj = null;
+        Object objFound = null;
+        List<Object> lst = new ArrayList<>();
+
+        try {
+            Class<?> arrType = clzzToParse;
+            int dim = 0;
+            while(clzzToParse.isArray()){
+                clzzToParse = clzzToParse.getComponentType();
+                ++dim;
+            }
+            for (Field f : clzzToParse.getFields()) {
+                if (f.getName().equals(key)) {
+                    //Todo: Need to account for arrays of arrays
+                    if(dataToParse instanceof Object[] objArray){
+                        for(Object found : objArray)
+                            lst.add(f.get(found));
+                    }
+                    else {
+                        lst.add(f.get(dataToParse));
+                    }
+                }
+                else if(!ClassUtils.isPrimitiveOrWrapper(f.getType()) && f.getType() != String.class){
+                    if(arrType != clzzToParse){
+                        //Todo: Need to account for arrays of arrays
+                        if(dataToParse instanceof Object[] objArray) {
+                            for (var arrItem : objArray) {
+                                lst.addAll(parseParsedByKey(key, f.getType(), f.get(arrItem)));
+                            }
+                        }
+                    }
+                    else {
+                        lst.addAll(parseParsedByKey(key, f.getType(), f.get(dataToParse)));
+                    }
+                }
+            }
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+        return lst;
     }
 
     public record ClassAndClasses(CtClass clzz, List<CtClass> innerClzzs){}
@@ -53,11 +99,15 @@ public class DynamicParseJson {
         var lst = new ArrayList<CtClass>();
         for(var ctClzz : toLookThrough.ctClzzzs()){
             if(ctClzz.getName().contains(key)){
-                return new ClassAndClasses(toLookThrough.clzz, List.of(ctClzz));
+                lst.add(ctClzz);
+                return new ClassAndClasses(toLookThrough.clzz, lst);
             }
             else {
                 lst.add(ctClzz);
-                return clzzFound(Arrays.stream(ctClzz.getNestedClasses()).toList(), key, lst);
+                var searched = clzzFound(Arrays.stream(ctClzz.getNestedClasses()).toList(), key, lst);
+                if(searched != null){
+                    return searched;
+                }
             }
         }
         return new ClassAndClasses(toLookThrough.clzz, new ArrayList<>());
@@ -156,13 +206,25 @@ public class DynamicParseJson {
                 }
                 else if(toParse instanceof JSONObject object){
                     if(justAMap(arr)){
-                        try {
-                            mapArray = Array.newInstance(Map.class, 0).getClass();
-                            addFieldToCtClass(newClass, prev, ClassPool.getDefault().get(mapArray.getName()));
-                            return new CtClzzz(newClass, Optional.of(mapArray), Arrays.stream(newClass.getNestedClasses()).toList());
-                        } catch (NotFoundException e) {
-                            e.printStackTrace();
-                        }
+//                        if(primitiveValues(arr)){
+                            try {
+                                mapArray = Array.newInstance(Map.class, 0).getClass();
+                                addFieldToCtClass(newClass, prev, ClassPool.getDefault().get(mapArray.getName()));
+                                return new CtClzzz(newClass, Optional.of(mapArray), Arrays.stream(newClass.getNestedClasses()).toList());
+                            } catch (NotFoundException e) {
+                                e.printStackTrace();
+                            }
+                            //Todo: Need to account for map of something other than primitive ... such as String to one object
+//                        }
+//                        else {
+//                            var val =  object.values().stream().findFirst();
+//                            if(val.get() instanceof JSONObject ob){
+//
+//                            }
+//                            else if (val.get() instanceof JSONArray ar){
+//                                dynamicParse(arr.toJSONString(), )
+//                            }
+//                        }
                     }
                     else {
                         try {
@@ -173,9 +235,11 @@ public class DynamicParseJson {
                             } catch (ClassNotFoundException e) {
                                 clzz = Array.newInstance(innerDynamic.get().clzz.toClass(), 1).getClass();
                             }
+
                             addFieldToCtClass(newClass, prev, ClassPool.getDefault().get(clzz.getName()));
-                            objectMapper.registerSubtypes(Class.forName(innerDynamic.get().clzz.getName()));
+                            objectMapper.registerSubtypes(Class.forName(innerDynamic.get().clzz.getName()), clzz);
                             return new CtClzzz(newClass, Optional.of(clzz), Arrays.stream(newClass.getNestedClasses()).toList());
+
                         } catch (NotFoundException | CannotCompileException | ClassNotFoundException e) {
                             e.printStackTrace();
                         }
@@ -196,7 +260,7 @@ public class DynamicParseJson {
                             }
                         }
                         else {
-                            var innerClass = dynamicParse(primOr.jo.toJSONString(), prev, Optional.of(newClass.makeNestedClass(prev, true)), directoryName);
+                            var innerClass = dynamicParse(primOr.jo.toJSONString(), prev, Optional.of(ClassPool.getDefault().makeClass(prev)), directoryName);
                             if(innerClass.isPresent()){
                                 try {
                                     var clzz = innerClass.get().clzz.toClass();
@@ -220,9 +284,21 @@ public class DynamicParseJson {
         return null;
     }
 
-    private boolean justAMap(JSONArray arr) {
+    private boolean primitiveValues(JSONArray arr) {
         for(var a : arr) {
-            Set<String> prev = null;
+            if (a instanceof JSONObject obj) {
+                for(var v : obj.values()){
+                    if(!ClassUtils.isPrimitiveOrWrapper(v.getClass()))
+                        return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean justAMap(JSONArray arr) {
+        Set<String> prev = null;
+        for(var a : arr) {
             if (a instanceof JSONObject obj) {
                 if (obj.keySet().stream().findFirst().get() instanceof String) {
                     if (prev == null)
@@ -252,7 +328,7 @@ public class DynamicParseJson {
                         }
                     }
                     else if(entry.getValue() instanceof JSONObject object){
-                        var innerDynamic = dynamicParse(object.toJSONString(), key, Optional.of(newClass.makeNestedClass(key, true)), directoryName);
+                        var innerDynamic = dynamicParse(object.toJSONString(), key, Optional.of(ClassPool.getDefault().makeClass(key)), directoryName);
                         if(innerDynamic.isPresent()) {
                             try {
                                 addFieldToCtClass(newClass, key, innerDynamic.get().clzz);
