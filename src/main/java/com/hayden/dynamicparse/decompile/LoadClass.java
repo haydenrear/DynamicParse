@@ -4,6 +4,7 @@ import javassist.CannotCompileException;
 import javassist.ClassPool;
 import javassist.NotFoundException;
 import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.ClassUtils;
 import org.jd.core.v1.api.loader.Loader;
 import org.springframework.stereotype.Component;
 
@@ -29,6 +30,13 @@ public class LoadClass implements Loader {
                 clzz.defrost();
             return clzz.toBytecode();
         } catch (IOException | CannotCompileException | NotFoundException e) {
+            try {
+                if(ClassUtils.isPrimitiveOrWrapper(Class.forName(internalName))){
+                    return new byte[0];
+                }
+            } catch (ClassNotFoundException ex) {
+                ex.printStackTrace();
+            }
             e.printStackTrace();
         }
         return new byte[0];
