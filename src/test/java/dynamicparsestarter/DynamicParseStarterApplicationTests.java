@@ -5,18 +5,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hayden.dynamicparse.parse.DynamicParseJson;
 import com.hayden.dynamicparse.parse.DynamicParsingException;
 import javassist.CannotCompileException;
+import javassist.ClassPool;
 import javassist.NotFoundException;
 import lombok.SneakyThrows;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
@@ -53,6 +52,40 @@ class DynamicParseStarterApplicationTests {
     }
 
     @Test @SneakyThrows
+    public void testDecompile(){
+
+        StringBuilder sb = new StringBuilder();
+
+        try(BufferedReader fr = new BufferedReader( new FileReader("src/test/resources/test_1.json"))){
+            fr.lines().forEachOrdered(sb::append);
+        }
+
+        var c  = dynamicParseJson.dynamicParse(sb.toString(), "token_1", Optional.empty(), Optional.of("src/main/resources")).get();
+
+        c.clzz().freeze();
+        c.clzz().toClass();
+
+        c.clzz().writeFile();
+        c.clzz().writeFile("src/main/resources");
+
+        assertThat(new File("src/main/resources/token_1.class").exists()).isTrue();
+
+        var name = Class.forName("token_1").getName();
+
+        var decompiled = dynamicParseJson.decompile(name);
+
+        try {
+            assertThat(decompiled).isInstanceOf(String.class);
+            assertThat(decompiled.length()).isNotZero();
+            System.out.println("decompiled: \n\n" + decompiled);
+        } catch (AssertionError a){
+            assertThat(decompiled).isInstanceOf(String.class);
+            assertThat(decompiled.length()).isNotZero();
+            System.out.println("decompiled: \n\n" + decompiled);
+        }
+    }
+
+    @Test @SneakyThrows
     public void mostComplex(){
         StringBuilder sb = new StringBuilder();
 
@@ -60,7 +93,7 @@ class DynamicParseStarterApplicationTests {
             fr.lines().forEachOrdered(sb::append);
         }
 
-        var output= dynamicParseJson.dynamicParse(sb.toString(), "token", Optional.empty(), Optional.empty()).get();
+        var output= dynamicParseJson.dynamicParse(sb.toString(), "token_2", Optional.empty(), Optional.empty()).get();
         System.out.println(output);
         var val = om.readValue(sb.toString(), output.clzz().toClass());
         assertThat(om.writeValueAsString(val)).isEqualTo(sb.toString().replaceAll("\\s+", ""));
@@ -90,14 +123,14 @@ class DynamicParseStarterApplicationTests {
     @Test @SneakyThrows
     public void testParseSaveClass(){
 
-        File file = new File("src/main/java/com/hayden/dynamicparsestarter/dynamic/"+"TestParse.java");
+        File file = new File("src/main/java/com/hayden/dynamicparsestarter/dynamic/"+"TestParse_1.java");
         if(file.exists()){
             file.delete();
         }
 
         StringBuilder sb = new StringBuilder();
 
-        try(BufferedReader fr = new BufferedReader( new FileReader("src/test/resources/toParse.json"))){
+        try(BufferedReader fr = new BufferedReader( new FileReader("src/test/resources/toParse_1.json"))){
             fr.lines().forEachOrdered(sb::append);
         }
 
@@ -108,7 +141,7 @@ class DynamicParseStarterApplicationTests {
     }
 
     @Test
-    public void testParseLoadClass() throws CannotCompileException, NotFoundException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException, ClassNotFoundException, IOException, NoSuchFieldException, DynamicParsingException {
+    public void testParseLoadClass() throws CannotCompileException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException, ClassNotFoundException, IOException, NoSuchFieldException, DynamicParsingException {
         StringBuilder sb = new StringBuilder();
         try(BufferedReader fr = new BufferedReader( new FileReader("src/test/resources/toParse.json"))){
             fr.lines().forEachOrdered(sb::append);
