@@ -2,10 +2,12 @@ package dynamicparsestarter;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hayden.dynamicparse.decompile.Decompile;
 import com.hayden.dynamicparse.decompile.DecompilePrinter;
 import com.hayden.dynamicparse.decompile.LoadClass;
 import com.hayden.dynamicparse.parse.DynamicParseJson;
 import com.hayden.dynamicparse.parse.DynamicParsingException;
+import com.hayden.dynamicparse.parse.ReParse;
 import javassist.CannotCompileException;
 import javassist.ClassPool;
 import javassist.NotFoundException;
@@ -26,12 +28,16 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(classes={DynamicParseJson.class, ObjectMapper.class, DecompilePrinter.class, LoadClass.class})
+@SpringBootTest(classes={DynamicParseJson.class, ObjectMapper.class, DecompilePrinter.class, LoadClass.class, ReParse.class, Decompile.class})
 @ExtendWith(SpringExtension.class)
 class DynamicParseStarterApplicationTests {
 
     @Autowired
     DynamicParseJson dynamicParseJson;
+    @Autowired
+    ReParse reParse;
+    @Autowired
+    Decompile decompile;
     @Autowired
     ObjectMapper om;
 
@@ -59,9 +65,8 @@ class DynamicParseStarterApplicationTests {
 
         var output= dynamicParseJson.dynamicParse(sb.toString(), "token", Optional.empty(), Optional.empty()).get();
         var obj = om.readValue(sb.toString(), output.clzz().toClass());
-//        var symbols = dynamicParseJson.parseParsedByKey("symbol", output, obj);
-//        assertThat(symbols.size()).isEqualTo(121);
-        var timeInFoce = dynamicParseJson.parseParsedByKey("timeInForce", output, obj);
+
+        var timeInFoce = reParse.parseParsedByKey("timeInForce", output, obj);
         for(var t : timeInFoce){
             System.out.println(t);
         }
@@ -88,7 +93,7 @@ class DynamicParseStarterApplicationTests {
 
         var name = Class.forName("token_1").getName();
 
-        var decompiled = dynamicParseJson.decompile(name);
+        var decompiled = decompile.decompile(name);
 
         try {
             assertThat(decompiled).isInstanceOf(String.class);
@@ -126,7 +131,7 @@ class DynamicParseStarterApplicationTests {
         var output= dynamicParseJson.dynamicParse(sb.toString(), "TestParsed", Optional.empty(), Optional.empty()).get();
         var val = om.readValue(sb.toString(), output.clzz().toClass());
 
-        List<Object> bids = dynamicParseJson.parseParsedByKey("bids", output, val);
+        List<Object> bids = reParse.parseParsedByKey("bids", output, val);
 
         System.out.println(bids);
 
