@@ -2,6 +2,8 @@ package dynamicparsestarter;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hayden.dynamicparse.decompile.DecompilePrinter;
+import com.hayden.dynamicparse.decompile.LoadClass;
 import com.hayden.dynamicparse.parse.DynamicParseJson;
 import com.hayden.dynamicparse.parse.DynamicParsingException;
 import javassist.CannotCompileException;
@@ -24,7 +26,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(classes={DynamicParseJson.class, ObjectMapper.class})
+@SpringBootTest(classes={DynamicParseJson.class, ObjectMapper.class, DecompilePrinter.class, LoadClass.class})
 @ExtendWith(SpringExtension.class)
 class DynamicParseStarterApplicationTests {
 
@@ -32,6 +34,20 @@ class DynamicParseStarterApplicationTests {
     DynamicParseJson dynamicParseJson;
     @Autowired
     ObjectMapper om;
+
+    @Test @SneakyThrows
+    public void symbols(){
+        StringBuilder sb = new StringBuilder();
+
+        try(BufferedReader fr = new BufferedReader( new FileReader("src/test/resources/symbol.json"))){
+            fr.lines().forEachOrdered(sb::append);
+        }
+
+        dynamicParseJson.dynamicParse(sb.toString(), "symbol", Optional.empty(), Optional.of("src/main/java/com/hayden/dynamicparsestarter/dynamic")).get();
+
+//        var symbols = dynamicParseJson.parseParsedByKey("symbol", output, obj);
+//        assertThat(symbols.size()).isEqualTo(121);
+    }
 
     @Test @SneakyThrows
     public void mostComplexGettingValues(){

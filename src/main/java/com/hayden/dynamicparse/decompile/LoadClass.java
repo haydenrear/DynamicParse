@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
+@Component
 public class LoadClass implements Loader {
 
     @Override
@@ -17,9 +18,8 @@ public class LoadClass implements Loader {
         try {
             return this.getClass().getResource("/" + internalName + ".class") != null || ClassPool.getDefault().get(internalName) != null;
         } catch (NotFoundException e) {
-            e.printStackTrace();
+            return false;
         }
-        return false;
     }
 
     @Override
@@ -31,7 +31,8 @@ public class LoadClass implements Loader {
             return clzz.toBytecode();
         } catch (IOException | CannotCompileException | NotFoundException e) {
             try {
-                if(ClassUtils.isPrimitiveOrWrapper(Class.forName(internalName))){
+                Class<?> clzzType = Class.forName(internalName);
+                if(ClassUtils.isPrimitiveOrWrapper(clzzType) || clzzType == String.class){
                     return new byte[0];
                 }
             } catch (ClassNotFoundException ex) {
