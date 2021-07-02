@@ -128,7 +128,7 @@ class DynamicParseStarterApplicationTests {
             fr.lines().forEachOrdered(sb::append);
         }
 
-        var output= dynamicParseJson.dynamicParse(sb.toString(), "TestParsed", Optional.empty(), Optional.empty()).get();
+        var output= dynamicParseJson.dynamicParse(sb.toString(), "TestParsed", Optional.empty(), Optional.of("src/main/resources")).get();
         var val = om.readValue(sb.toString(), output.clzz().toClass());
 
         List<Object> bids = reParse.parseParsedByKey("bids", output, val);
@@ -206,7 +206,7 @@ class DynamicParseStarterApplicationTests {
 
         output.arrClzz().flatMap(clzz -> {
             try {
-                var readVal = om.readValue(sb.toString(), Array.newInstance(clzz, 1).getClass());
+                var readVal = om.readValue(sb.toString(), clzz);
                 System.out.println(om.writeValueAsString(readVal));
                 assertThat(om.writeValueAsString(readVal)).isEqualTo(sb.toString().replaceAll("\\s+", ""));
             } catch (JsonProcessingException e) {

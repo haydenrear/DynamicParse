@@ -191,7 +191,7 @@ public class DynamicParseJson {
                     JSONArray innerArr = (JSONArray) toParse;
                     var primOrOpt = findIfPrimitive(
                             innerArr,
-                            1
+                            2
                     );
                     if (primOrOpt.isPresent()) {
                         var primOr = primOrOpt.get();
