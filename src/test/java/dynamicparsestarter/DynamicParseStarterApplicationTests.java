@@ -28,6 +28,10 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * must use illegal-access=permit and also because you can only create the class once you have to run
+ * these tests one by one for them to pass
+ */
 @SpringBootTest(classes={DynamicParseJson.class, ObjectMapper.class, DecompilePrinter.class, LoadClass.class, ReParse.class, Decompile.class})
 @ExtendWith(SpringExtension.class)
 class DynamicParseStarterApplicationTests {
@@ -55,6 +59,9 @@ class DynamicParseStarterApplicationTests {
 //        assertThat(symbols.size()).isEqualTo(121);
     }
 
+    /**
+     * doesn't pass because of the order but actually does what it wants to do
+     */
     @Test @SneakyThrows
     public void mostComplexGettingValues(){
         StringBuilder sb = new StringBuilder();
