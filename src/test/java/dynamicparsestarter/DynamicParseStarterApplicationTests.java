@@ -62,7 +62,8 @@ class DynamicParseStarterApplicationTests {
     /**
      * doesn't pass because of the order but actually does what it wants to do
      */
-    @Test @SneakyThrows
+    @Test
+    @SneakyThrows
     public void mostComplexGettingValues(){
         StringBuilder sb = new StringBuilder();
 

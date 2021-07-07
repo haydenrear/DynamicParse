@@ -1,7 +1,7 @@
 package com.hayden.dynamicparse.parse;
 
-import lombok.NoArgsConstructor;
-import lombok.SneakyThrows;
+//import lombok.NoArgsConstructor;
+//import lombok.SneakyThrows;
 import org.apache.commons.lang3.ClassUtils;
 import org.springframework.stereotype.Service;
 
@@ -12,12 +12,12 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-@NoArgsConstructor
+//@NoArgsConstructor
 public class ReParse {
 
 
 
-    @SneakyThrows
+//    @SneakyThrows
     public List<Object> parseParsedByKey(
             String key,
             DynamicParseJson.ClassInfo clzzToParse,
