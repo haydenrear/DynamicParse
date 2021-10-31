@@ -16,11 +16,9 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-@Service
 public class DynamicParseJson {
 
     ObjectMapper objectMapper;
-
 
     public DynamicParseJson(
             ObjectMapper objectMapper
@@ -281,7 +279,7 @@ public class DynamicParseJson {
                                 key,
                                 classInfo -> {
                                     try {
-                                        return classInfo.clzz.toClass();
+                                        return classInfo.clzz.toClass(ReParse.class);
                                     } catch (CannotCompileException e) {
                                         e.printStackTrace();
                                     }
@@ -359,7 +357,7 @@ public class DynamicParseJson {
         } catch (ClassNotFoundException e) {
             try {
                 clzz = makeArray(
-                        innerDynamic.clzz.toClass(),
+                        innerDynamic.clzz.toClass(ReParse.class),
                         depth
                 );
             } catch (CannotCompileException ex) {

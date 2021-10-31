@@ -9,18 +9,15 @@ import com.hayden.dynamicparse.parse.DynamicParseJson;
 import com.hayden.dynamicparse.parse.DynamicParsingException;
 import com.hayden.dynamicparse.parse.ReParse;
 import javassist.CannotCompileException;
-import javassist.ClassPool;
-import javassist.NotFoundException;
 import lombok.SneakyThrows;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import java.io.*;
-import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.List;
@@ -34,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest(classes={DynamicParseJson.class, ObjectMapper.class, DecompilePrinter.class, LoadClass.class, ReParse.class, Decompile.class})
 @ExtendWith(SpringExtension.class)
+@DirtiesContext
 class DynamicParseStarterApplicationTests {
 
     @Autowired
@@ -57,6 +55,33 @@ class DynamicParseStarterApplicationTests {
 
 //        var symbols = dynamicParseJson.parseParsedByKey("symbol", output, obj);
 //        assertThat(symbols.size()).isEqualTo(121);
+    }
+
+    @Test
+    public void ParseFile()
+    {
+        parseFile("CNBC.json", "CnbcClzzs");
+    }
+
+    @SneakyThrows
+    public void parseFile(String filenameInTestResources, String className)
+    {
+        StringBuilder sb = new StringBuilder();
+
+        try(BufferedReader fr = new BufferedReader( new FileReader("src/test/resources/"+filenameInTestResources))){
+            fr.lines().forEachOrdered(sb::append);
+        }
+
+        dynamicParseJson.dynamicParse(sb.toString(), className, Optional.empty(), Optional.of("src/main/java/com/hayden/dynamicparsestarter/dynamic")).get();
+        String cnbcClzzs = decompile.decompile(className);
+        File file = new File("src/main/java/com/hayden/dynamicparsestarter/dynamic/"+className+".java");
+        if(!file.exists())
+            file.createNewFile();
+
+        try(BufferedWriter wr = new BufferedWriter(new FileWriter(file))){
+            wr.write(cnbcClzzs);
+        }
+
     }
 
     /**

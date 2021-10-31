@@ -3,7 +3,6 @@ package com.hayden.dynamicparse.decompile;
 import org.jd.core.v1.ClassFileToJavaSourceDecompiler;
 import org.springframework.stereotype.Service;
 
-@Service
 public class Decompile {
 
     DecompilePrinter printer;
