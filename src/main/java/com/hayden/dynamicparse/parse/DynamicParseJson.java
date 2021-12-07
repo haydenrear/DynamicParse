@@ -390,7 +390,10 @@ public class DynamicParseJson {
         for (var a : arr) {
             if (a instanceof JSONObject) {
                 JSONObject obj = (JSONObject) a;
-                if (obj.keySet().stream().findFirst().get() instanceof String) {
+                if(arr.size() == 1){
+                    return false;
+                }
+                else if (obj.keySet().stream().findFirst().get() instanceof String) {
                     if (prev == null)
                         prev = obj.keySet();
                     else return !prev.containsAll((Set<String>) obj.keySet());

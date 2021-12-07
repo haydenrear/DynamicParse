@@ -63,6 +63,11 @@ class DynamicParseStarterApplicationTests {
         parseFile("CNBC.json", "CnbcClzzs");
     }
 
+    @Test
+    public void parseMediaRequest() {
+        parseFile("mediaRequest.json", "media");
+    }
+
     @SneakyThrows
     public void parseFile(String filenameInTestResources, String className)
     {
